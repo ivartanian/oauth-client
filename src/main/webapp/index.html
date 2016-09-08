@@ -8,10 +8,10 @@
     <meta name="viewport" content="width=device-width" />
     <base href="/" />
     <link rel="stylesheet" type="text/css"
-          href="/webjars/bootstrap/css/bootstrap.min.css" />
-    <script type="text/javascript" src="/webjars/jquery/jquery.min.js"></script>
+          href="/webjars/bootstrap/3.2.0/css/bootstrap.min.css" />
+    <script type="text/javascript" src="/webjars/jquery/2.1.1/jquery.min.js"></script>
     <script type="text/javascript"
-            src="/webjars/bootstrap/js/bootstrap.min.js"></script>
+            src="/webjars/bootstrap/3.2.0/js/bootstrap.min.js"></script>
 </head>
 <body ng-app="app" ng-controller="home as home">
 <h1>Login</h1>
@@ -22,11 +22,13 @@
 </div>
 <div class="container" ng-show="home.authenticated">
     Logged in as: <span ng-bind="home.user"></span>
+    <br>
+    Token: <span ng-bind="home.token"></span>
     <div>
         <button ng-click="home.logout()" class="btn btn-primary">Logout</button>
     </div>
 </div>
-<script type="text/javascript" src="/webjars/angularjs/angular.min.js"></script>
+<script type="text/javascript" src="/webjars/angularjs/1.4.3/angular.min.js"></script>
 <script type="text/javascript">
     angular
             .module("app", [])
@@ -37,6 +39,7 @@
         var self = this;
         $http.get("/user").success(function(data) {
             self.user = data.userAuthentication.details.name;
+            self.token = data.details.tokenValue;
             self.authenticated = true;
         }).error(function() {
             self.user = "N/A";

@@ -5,8 +5,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.OAuth2ClientContext;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter;
@@ -14,9 +16,7 @@ import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilt
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.common.AuthenticationScheme;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
-import org.springframework.security.oauth2.provider.token.store.InMemoryTokenStore;
-import org.springframework.security.web.access.ExceptionTranslationFilter;
+import org.springframework.security.oauth2.provider.token.RemoteTokenServices;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
@@ -24,6 +24,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.RequestContextFilter;
+import ua.com.skywell.oauth.custom.UserInfoTokenServices;
 
 import javax.servlet.Filter;
 import java.security.Principal;
@@ -58,25 +59,39 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
     }
 
     @Override
+    public void configure(WebSecurity web) throws Exception {
+        web.ignoring().antMatchers("/resources/**");
+    }
+
+    @Override
     protected void configure(HttpSecurity http) throws Exception {
-        // @formatter:off
-        http.antMatcher("/**").authorizeRequests().antMatchers("/", "/login**").permitAll().anyRequest()
-                .authenticated().and().exceptionHandling()
-                .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/")).and().logout()
-                .logoutSuccessUrl("/").permitAll().and().csrf()
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()).and()
+        http
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.NEVER)
+                .and()
+                .authorizeRequests().antMatchers("/", "/login**", "/webjars/**").permitAll()
+                .anyRequest().authenticated()
+                .and()
+                .exceptionHandling().authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/"))
+                .and()
+                .logout().logoutSuccessUrl("/").permitAll()
+                .and()
+                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .and()
                 .addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class)
                 .addFilterBefore(requestContextFilter(), OAuth2ClientAuthenticationProcessingFilter.class)
                 .addFilterBefore(oAuth2ClientContextFilter, LogoutFilter.class);
-        // @formatter:on
     }
 
     private Filter ssoFilter() {
         OAuth2ClientAuthenticationProcessingFilter facebookFilter = new OAuth2ClientAuthenticationProcessingFilter("/login/facebook");
-        OAuth2RestTemplate facebookTemplate = new OAuth2RestTemplate(facebook(), oauth2ClientContext);
-        facebookFilter.setRestTemplate(facebookTemplate);
-        facebookFilter.setTokenServices(inMemoryTokenServices());
+        facebookFilter.setRestTemplate(restTemplate());
+        facebookFilter.setTokenServices(new UserInfoTokenServices("https://graph.facebook.com/me", facebook().getClientId()));
         return facebookFilter;
+    }
+
+    @Bean
+    public OAuth2RestTemplate restTemplate() {
+        return new OAuth2RestTemplate(facebook(), oauth2ClientContext);
     }
 
     @Bean
@@ -87,10 +102,10 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
     @Bean
     public AuthorizationCodeResourceDetails facebook() {
         AuthorizationCodeResourceDetails details = new AuthorizationCodeResourceDetails();
-//        details.setClientId("233668646673605");
-//        details.setClientSecret("33b17e044ee6a4fa383f46ec6e28ea1d");
-        details.setClientId("633144140184253");
-        details.setClientSecret("d55483e709a9e2146e1a40528f64f4ef");
+        details.setClientId("233668646673605");
+        details.setClientSecret("33b17e044ee6a4fa383f46ec6e28ea1d");
+//        details.setClientId("633144140184253");
+//        details.setClientSecret("d55483e709a9e2146e1a40528f64f4ef");
         details.setAccessTokenUri("https://graph.facebook.com/oauth/access_token");
         details.setUserAuthorizationUri("https://www.facebook.com/dialog/oauth");
         details.setTokenName("oauth_token");
@@ -101,10 +116,13 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
     }
 
     @Bean
-    public DefaultTokenServices inMemoryTokenServices() {
-        InMemoryTokenStore tok = new InMemoryTokenStore();
-        DefaultTokenServices tokenService = new DefaultTokenServices();
-        tokenService.setTokenStore(tok);
+    public RemoteTokenServices tokenService() {
+        RemoteTokenServices tokenService = new RemoteTokenServices();
+        tokenService.setCheckTokenEndpointUrl("https://graph.facebook.com/me");
+        tokenService.setClientId("233668646673605");
+        tokenService.setClientSecret("33b17e044ee6a4fa383f46ec6e28ea1d");
+        tokenService.setTokenName("oauth_token");
+        tokenService.setRestTemplate(restTemplate());
         return tokenService;
     }
 
