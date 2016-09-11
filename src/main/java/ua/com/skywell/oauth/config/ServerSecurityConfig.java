@@ -3,6 +3,7 @@ package ua.com.skywell.oauth.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,7 +17,10 @@ import org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticat
 import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilter;
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.common.AuthenticationScheme;
+import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
+import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
+import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
@@ -38,6 +42,8 @@ import java.util.Arrays;
 @EnableWebSecurity(debug = true)
 @RestController
 @EnableOAuth2Client
+//@EnableAuthorizationServer
+@Order(6)
 public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final OAuth2ClientContext oauth2ClientContext;
@@ -55,8 +61,8 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
                 .withUser("user").password("user").roles("USER");
     }
 
-    @RequestMapping("/api/user")
-    public Principal user(Principal principal, HttpServletRequest request) {
+    @RequestMapping({"/user", "/api/me"})
+    public Principal user(Principal principal) {
         return principal;
     }
 
@@ -68,8 +74,7 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-//                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-//                .and()
+                .antMatcher("/**")
                 .authorizeRequests().antMatchers("/", "/login**", "/webjars/**").permitAll()
                 .anyRequest().authenticated()
                 .and()
@@ -168,6 +173,17 @@ public class ServerSecurityConfig extends WebSecurityConfigurerAdapter {
         details.setPreEstablishedRedirectUri("http://localhost:8080");
         details.setScope(Arrays.asList("https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"));
         return details;
+    }
+
+    @Configuration
+    @EnableResourceServer
+    protected static class ResourceServerConfiguration extends ResourceServerConfigurerAdapter {
+        @Override
+        public void configure(HttpSecurity http) throws Exception {
+            // @formatter:off
+            http.antMatcher("/api/**").authorizeRequests().anyRequest().authenticated();
+            // @formatter:on
+        }
     }
 
 }

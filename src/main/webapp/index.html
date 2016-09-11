@@ -43,7 +43,7 @@
                         $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
                     }).controller("home", function ($http, $location) {
         var self = this;
-        $http.get("/api/user").success(function (data) {
+        $http.get("/user").success(function (data) {
             if (data.name) {
                 self.user = data.name;
                 self.token = data.details.tokenValue;
